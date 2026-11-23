@@ -1,0 +1,62 @@
+import{a as e,c as t,i as n,l as r,o as i,r as a,s as o}from"./SceneRig-BPc5LBV-.js";import{B as s,D as c,E as l,F as u,I as d,N as f,O as p,P as m,R as h,V as g,b as _,c as v,g as y,i as b,n as ee,o as x,t as S,x as C,z as w}from"./index-PKaI5gil.js";var T=g(s()),te=g(w()),E=new m,D=new m,O=new m,k=new f;function A(e,t,n){let r=E.setFromMatrixPosition(e.matrixWorld);r.project(t);let i=n.width/2,a=n.height/2;return[r.x*i+i,-(r.y*a)+a]}function j(e,t){let n=E.setFromMatrixPosition(e.matrixWorld),r=D.setFromMatrixPosition(t.matrixWorld),i=n.sub(r),a=t.getWorldDirection(O);return i.angleTo(a)>Math.PI/2}function M(e,t,n,r){let i=E.setFromMatrixPosition(e.matrixWorld),a=i.clone();a.project(t),k.set(a.x,a.y),n.setFromCamera(k,t);let o=n.intersectObjects(r,!0);if(o.length){let e=o[0].distance;return i.distanceTo(n.ray.origin)<e}return!0}function ne(e,t){if(t instanceof _)return t.zoom;if(t instanceof C){let n=E.setFromMatrixPosition(e.matrixWorld),r=D.setFromMatrixPosition(t.matrixWorld),i=t.fov*Math.PI/180,a=n.distanceTo(r);return 1/(2*Math.tan(i/2)*a)}return 1}function re(e,t,n){if(t instanceof C||t instanceof _){let r=E.setFromMatrixPosition(e.matrixWorld),i=D.setFromMatrixPosition(t.matrixWorld),a=r.distanceTo(i),o=(n[1]-n[0])/(t.far-t.near),s=n[1]-o*t.far;return Math.round(o*a+s)}}var N=e=>Math.abs(e)<1e-10?0:e;function P(e,t,n=``){let r=`matrix3d(`;for(let n=0;n!==16;n++)r+=N(t[n]*e.elements[n])+(n===15?`)`:`,`);return n+r}var ie=(e=>t=>P(t,e))([1,-1,1,1,1,-1,1,1,1,-1,1,1,1,-1,1,1]),ae=(e=>(t,n)=>P(t,e(n),`translate(-50%,-50%)`))(e=>[1/e,1/e,1/e,1,-1/e,-1/e,-1/e,-1,1/e,1/e,1/e,1,1,1,1,1]);function oe(e){return e&&typeof e==`object`&&`current`in e}var F=T.forwardRef(({children:e,eps:t=.001,style:n,className:i,prepend:a,center:o,fullscreen:s,portal:c,distanceFactor:l,sprite:u=!1,transform:d=!1,occlude:f,onOcclude:p,castShadow:h,receiveShadow:g,material:_,geometry:v,zIndexRange:y=[16777271,0],calculatePosition:b=A,as:x=`div`,wrapperClass:C,pointerEvents:w=`auto`,...E},D)=>{let{gl:O,camera:k,scene:P,size:F,raycaster:I,events:L,viewport:R}=ee(),[z]=T.useState(()=>document.createElement(x)),B=T.useRef(null),V=T.useRef(null),H=T.useRef(0),U=T.useRef([0,0]),W=T.useRef(null),G=T.useRef(null),K=c?.current||L.connected||O.domElement.parentNode,q=T.useRef(null),J=T.useRef(!1),Y=T.useMemo(()=>f&&f!==`blending`||Array.isArray(f)&&f.length&&oe(f[0]),[f]);T.useLayoutEffect(()=>{let e=O.domElement;f&&f===`blending`?(e.style.zIndex=`${Math.floor(y[0]/2)}`,e.style.position=`absolute`,e.style.pointerEvents=`none`):(e.style.zIndex=null,e.style.position=null,e.style.pointerEvents=null)},[f]),T.useLayoutEffect(()=>{if(V.current){let e=B.current=te.createRoot(z);if(P.updateMatrixWorld(),d)z.style.cssText=`position:absolute;top:0;left:0;pointer-events:none;overflow:hidden;`;else{let e=b(V.current,k,F);z.style.cssText=`position:absolute;top:0;left:0;transform:translate3d(${e[0]}px,${e[1]}px,0);transform-origin:0 0;`}return K&&(a?K.prepend(z):K.appendChild(z)),()=>{K&&K.removeChild(z),e.unmount()}}},[K,d]),T.useLayoutEffect(()=>{C&&(z.className=C)},[C]);let X=T.useMemo(()=>d?{position:`absolute`,top:0,left:0,width:F.width,height:F.height,transformStyle:`preserve-3d`,pointerEvents:`none`}:{position:`absolute`,transform:o?`translate3d(-50%,-50%,0)`:`none`,...s&&{top:-F.height/2,left:-F.width/2,width:F.width,height:F.height},...n},[n,o,s,F,d]),Z=T.useMemo(()=>({position:`absolute`,pointerEvents:w}),[w]);T.useLayoutEffect(()=>{if(J.current=!1,d){var t;(t=B.current)==null||t.render(T.createElement(`div`,{ref:W,style:X},T.createElement(`div`,{ref:G,style:Z},T.createElement(`div`,{ref:D,className:i,style:n,children:e}))))}else{var r;(r=B.current)==null||r.render(T.createElement(`div`,{ref:D,style:X,className:i,children:e}))}});let Q=T.useRef(!0);S(e=>{if(V.current){k.updateMatrixWorld(),V.current.updateWorldMatrix(!0,!1);let e=d?U.current:b(V.current,k,F);if(d||Math.abs(H.current-k.zoom)>t||Math.abs(U.current[0]-e[0])>t||Math.abs(U.current[1]-e[1])>t){let t=j(V.current,k),n=!1;Y&&(Array.isArray(f)?n=f.map(e=>e.current):f!==`blending`&&(n=[P]));let r=Q.current;if(n){let e=M(V.current,k,I,n);Q.current=e&&!t}else Q.current=!t;r!==Q.current&&(p?p(!Q.current):z.style.display=Q.current?`block`:`none`);let i=Math.floor(y[0]/2),a=f?Y?[y[0],i]:[i-1,0]:y;if(z.style.zIndex=`${re(V.current,k,a)}`,d){let[e,t]=[F.width/2,F.height/2],n=k.projectionMatrix.elements[5]*t,{isOrthographicCamera:r,top:i,left:a,bottom:o,right:s}=k,c=ie(k.matrixWorldInverse),d=r?`scale(${n})translate(${N(-(s+a)/2)}px,${N((i+o)/2)}px)`:`translateZ(${n}px)`,f=V.current.matrixWorld;u&&(f=k.matrixWorldInverse.clone().transpose().copyPosition(f).scale(V.current.scale),f.elements[3]=f.elements[7]=f.elements[11]=0,f.elements[15]=1),z.style.width=F.width+`px`,z.style.height=F.height+`px`,z.style.perspective=r?``:`${n}px`,W.current&&G.current&&(W.current.style.transform=`${d}${c}translate(${e}px,${t}px)`,G.current.style.transform=ae(f,1/((l||10)/400)))}else{let t=l===void 0?1:ne(V.current,k)*l;z.style.transform=`translate3d(${e[0]}px,${e[1]}px,0) scale(${t})`}U.current=e,H.current=k.zoom}}if(!Y&&q.current&&!J.current){if(d){if(W.current){let e=W.current.children[0];if(e!=null&&e.clientWidth&&e!=null&&e.clientHeight){let{isOrthographicCamera:t}=k;if(t||v)E.scale&&(Array.isArray(E.scale)?E.scale instanceof m?q.current.scale.copy(E.scale.clone().divideScalar(1)):q.current.scale.set(1/E.scale[0],1/E.scale[1],1/E.scale[2]):q.current.scale.setScalar(1/E.scale));else{let t=(l||10)/400,n=e.clientWidth*t,r=e.clientHeight*t;q.current.scale.set(n,r,1)}J.current=!0}}}else{let t=z.children[0];if(t!=null&&t.clientWidth&&t!=null&&t.clientHeight){let e=1/R.factor,n=t.clientWidth*e,r=t.clientHeight*e;q.current.scale.set(n,r,1),J.current=!0}q.current.lookAt(e.camera.position)}}});let $=T.useMemo(()=>({vertexShader:d?void 0:`
+          /*
+            This shader is from the THREE's SpriteMaterial.
+            We need to turn the backing plane into a Sprite
+            (make it always face the camera) if "transfrom"
+            is false.
+          */
+          #include <common>
+
+          void main() {
+            vec2 center = vec2(0., 1.);
+            float rotation = 0.0;
+
+            // This is somewhat arbitrary, but it seems to work well
+            // Need to figure out how to derive this dynamically if it even matters
+            float size = 0.03;
+
+            vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+            vec2 scale;
+            scale.x = length( vec3( modelMatrix[ 0 ].x, modelMatrix[ 0 ].y, modelMatrix[ 0 ].z ) );
+            scale.y = length( vec3( modelMatrix[ 1 ].x, modelMatrix[ 1 ].y, modelMatrix[ 1 ].z ) );
+
+            bool isPerspective = isPerspectiveMatrix( projectionMatrix );
+            if ( isPerspective ) scale *= - mvPosition.z;
+
+            vec2 alignedPosition = ( position.xy - ( center - vec2( 0.5 ) ) ) * scale * size;
+            vec2 rotatedPosition;
+            rotatedPosition.x = cos( rotation ) * alignedPosition.x - sin( rotation ) * alignedPosition.y;
+            rotatedPosition.y = sin( rotation ) * alignedPosition.x + cos( rotation ) * alignedPosition.y;
+            mvPosition.xy += rotatedPosition;
+
+            gl_Position = projectionMatrix * mvPosition;
+          }
+      `,fragmentShader:`
+        void main() {
+          gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+        }
+      `}),[d]);return T.createElement(`group`,r({},E,{ref:V}),f&&!Y&&T.createElement(`mesh`,{castShadow:h,receiveShadow:g,ref:q},v||T.createElement(`planeGeometry`,null),_||T.createElement(`shaderMaterial`,{side:2,vertexShader:$.vertexShader,fragmentShader:$.fragmentShader})))}),I=h(),L=`
+  varying vec3 vDir;
+  void main() {
+    vDir = normalize(position);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`,R=`
+  uniform vec3 uTop;
+  uniform vec3 uBottom;
+  uniform vec3 uSunDir;
+  uniform vec3 uSunColor;
+  uniform float uSunPower;
+  varying vec3 vDir;
+
+  void main() {
+    vec3 dir = normalize(vDir);
+    float h = smoothstep(-0.12, 0.8, dir.y);
+    vec3 c = mix(uBottom, uTop, pow(h, 0.65));
+    float s = max(dot(dir, uSunDir), 0.0);
+    c += uSunColor * (pow(s, 350.0) * 3.0 + pow(s, 24.0) * 0.5 + pow(s, 4.0) * 0.18) * uSunPower;
+    gl_FragColor = vec4(c, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`;function z({top:e,bottom:t,sun:n=[0,1,0],sunColor:r=`#ffffff`,sunPower:i=0}){let[a,o,s]=n,c=(0,T.useMemo)(()=>new p({vertexShader:L,fragmentShader:R,side:1,depthWrite:!1,fog:!1,uniforms:{uTop:{value:new v(e)},uBottom:{value:new v(t)},uSunDir:{value:new m(a,o,s).normalize()},uSunColor:{value:new v(r)},uSunPower:{value:i}}}),[e,t,a,o,s,r,i]);return(0,I.jsx)(`mesh`,{material:c,renderOrder:-10,frustumCulled:!1,children:(0,I.jsx)(`sphereGeometry`,{args:[140,32,16]})})}var B=null;function V(){if(!B){let e=document.createElement(`canvas`);e.width=e.height=128;let t=e.getContext(`2d`),n=t.createRadialGradient(64,64,0,64,64,64);n.addColorStop(0,`rgba(255,255,255,1)`),n.addColorStop(.2,`rgba(255,255,255,0.62)`),n.addColorStop(.5,`rgba(255,255,255,0.17)`),n.addColorStop(1,`rgba(255,255,255,0)`),t.fillStyle=n,t.fillRect(0,0,128,128),B=new x(e),B.colorSpace=c}return B}function H({color:e,scale:t=1,opacity:n=1,additive:r=!0,...i}){let[a,o]=typeof t==`number`?[t,t]:t;return(0,I.jsx)(`sprite`,{scale:[a,o,1],dispose:null,...i,children:(0,I.jsx)(`spriteMaterial`,{map:V(),color:e,transparent:!0,opacity:n,depthWrite:!1,fog:!1,blending:r?2:1})})}var U=u?1024:2048;function W({position:e,color:t=`#ffffff`,intensity:n=2.5,extent:r=13}){let i=d(e=>e.quality>.4);return(0,I.jsx)(`directionalLight`,{position:e,color:t,intensity:n,castShadow:i,"shadow-mapSize":[U,U],"shadow-bias":-4e-4,"shadow-normalBias":.05,children:(0,I.jsx)(`orthographicCamera`,{attach:`shadow-camera`,args:[-r,r,r,-r,.5,80]})})}function G(r){let i=r.seed*17.31,a=r.seed*-9.73,o=r.sink??r.radius*.2;return(s,c)=>{let l=Math.hypot(s,c),u=(n(s*r.freq+i,r.seed*3.1,c*r.freq+a,4)-.5)*2*r.amp;r.flat&&(u*=e(.12,1,t(r.flat*.5,r.flat*1.8,l)));let d=t(r.radius*.8,r.radius,l);return u-d*d*o}}function K(e,t=G(e)){let n=new l(1e-4,e.radius,96,44);n.rotateX(-Math.PI/2);let r=n.getAttribute(`position`),i=new Float32Array(r.count*3),[s,c,u]=e.colors.map(e=>new v(e)),d=new v,f=e.amp||1;for(let e=0;e<r.count;e++){let n=r.getX(e),l=r.getZ(e),p=t(n,l);r.setY(e,p);let m=a(p/f*.9+.5)+(o(n*.9+3,1.7,l*.9-5)-.5)*.4;m<.5?d.copy(s).lerp(c,a(m*2)):d.copy(c).lerp(u,a((m-.5)*2)),i[e*3]=d.r,i[e*3+1]=d.g,i[e*3+2]=d.b}return n.deleteAttribute(`uv`),n.setAttribute(`color`,new b(i,3)),n.computeVertexNormals(),n.computeBoundingSphere(),n}function q(e,t=1.05,n=4.5){return{angle:Math.atan2(e[2],e[0]),half:t,from:n}}function J(t){let n=i(t.seed),r=t.rMin??0,[a,o]=t.scale??[1,1],s=[],c=0;for(;s.length<t.count&&c++<t.count*30;){let i=n()*Math.PI*2,c=Math.sqrt(e(r*r,t.rMax*t.rMax,n())),l=Math.cos(i)*c,u=Math.sin(i)*c,d=e(a,o,n()),f=n()*Math.PI*2,p=(n()-.5)*(t.tilt??0),m=(n()-.5)*(t.tilt??0);if(t.avoid?.some(e=>Math.hypot(l-e.x,u-e.z)<e.r))continue;if(t.open&&c>t.open.from){let e=i-t.open.angle;if(Math.abs(Math.atan2(Math.sin(e),Math.cos(e)))<t.open.half)continue}let h=t.h?t.h(l,u):0;t.minY!==void 0&&h<t.minY||t.maxY!==void 0&&h>t.maxY||s.push({p:[l,h-(t.sink??0)*d,u],r:[p,f,m],s:d})}return s}var Y=(0,T.createContext)(!0);function X({position:e,tone:t=`sand`,children:n}){return(0,T.useContext)(Y)?(0,I.jsx)(F,{position:e,center:!0,pointerEvents:`none`,zIndexRange:[4,0],children:(0,I.jsx)(`div`,{className:`scene-label`,"data-tone":t,children:n})}):null}function Z({spec:e,h:t,roughness:n=.95,...r}){let i=(0,T.useMemo)(()=>K(e,t??G(e)),[e,t]);return(0,I.jsx)(`mesh`,{geometry:i,receiveShadow:!0,...r,children:(0,I.jsx)(`meshStandardMaterial`,{vertexColors:!0,roughness:n,metalness:0})})}function Q({active:e,children:t}){let n=(0,T.useRef)(null),r=(0,T.useRef)(+!!e);return S((t,i)=>{let a=n.current;if(!a)return;r.current=y.damp(r.current,+!!e,e?4.5:9,Math.min(i,.05));let o=r.current;a.visible=o>.012,a.scale.setScalar(Math.max(o,.001)),a.rotation.y=(1-o)*-1.9,a.position.y=(1-o)*-.4}),(0,I.jsx)(`group`,{ref:n,visible:e,scale:e?1:.001,children:(0,I.jsx)(Y.Provider,{value:e,children:t})})}export{J as a,z as c,G as i,W as l,Q as n,q as o,Z as r,H as s,X as t};
