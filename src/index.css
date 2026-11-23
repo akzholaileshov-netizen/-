@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+
+/* Палитра: терең жасыл · лава · алтын-құм */
+@theme {
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-night: #030a07;
+  --color-jungle-950: #04120c;
+  --color-jungle-900: #071a12;
+  --color-jungle-800: #0c2a1c;
+  --color-jungle-600: #1d5a3c;
+  --color-jungle-400: #3fa36c;
+  --color-jungle-300: #5fd49a;
+
+  --color-lava-600: #e0341d;
+  --color-lava-500: #ff4d2e;
+  --color-lava-400: #ff6a3d;
+
+  --color-sand-200: #f1e2bd;
+  --color-sand-300: #e2c07a;
+  --color-sand-400: #d9b76a;
+  --color-sand-500: #c79a45;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--color-night);
+  color: #f4efe4;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Слайд панелінің орналасуы (ViewOffset осы өлшемдерге сүйенеді) ---------- */
+
+.slide-area {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  padding: 56px 12px 78px;
+  pointer-events: none;
+}
+
+.slide-panel {
+  width: 100%;
+  max-height: 54dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+@media (orientation: landscape) {
+  .slide-area {
+    align-items: center;
+    padding: 56px 16px 72px;
+  }
+  /* --panel-zoom мәнін src/layout.ts есептейді: проекторда ірі, шағын экранда кіші */
+  .slide-panel {
+    width: calc(48vw * var(--panel-widen, 1));
+    zoom: var(--panel-zoom, 1);
+    max-height: calc((100dvh - 128px) / var(--panel-zoom, 1));
+  }
+}
+
+@media (orientation: landscape) and (min-width: 1024px) {
+  .slide-area {
+    padding: 76px 40px 92px;
+  }
+  .slide-panel {
+    width: calc(min(560px, 42vw) * var(--panel-widen, 1));
+    max-height: calc((100dvh - 168px) / var(--panel-zoom, 1));
+  }
+}
+
+/* ---------- Шыны панель ---------- */
+
+.glass {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: linear-gradient(155deg, rgb(12 38 26 / 0.62), rgb(5 14 10 / 0.5));
+  box-shadow:
+    0 30px 80px -24px rgb(0 0 0 / 0.75),
+    inset 0 1px 0 rgb(255 255 255 / 0.09);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+.glass-chip {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(6 18 13 / 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ---------- Кинематографиялық виньетка ---------- */
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 85% 75% at 62% 46%, transparent 42%, rgb(2 6 4 / 0.6) 100%),
+    linear-gradient(to top, rgb(2 6 4 / 0.82), transparent 20%),
+    linear-gradient(to bottom, rgb(2 6 4 / 0.6), transparent 15%);
+}
+
+/* ---------- 3D сахнадағы жазулар (drei <Html>) ---------- */
+
+.scene-label {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgb(226 192 122 / 0.28);
+  background: rgb(4 12 9 / 0.55);
+  color: var(--color-sand-200);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  animation: label-in 0.6s ease-out both;
+}
+
+@keyframes label-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.scene-label[data-tone='lava'] {
+  border-color: rgb(255 106 61 / 0.4);
+  color: #ffc3ad;
+}
+
+.scene-label[data-tone='jungle'] {
+  border-color: rgb(95 212 154 / 0.35);
+  color: #c9f5de;
+}
+
+@media (max-width: 640px) {
+  .scene-label {
+    font-size: 9px;
+    padding: 2px 7px;
+  }
+}
+
+/* Жүктелу индикаторы */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
