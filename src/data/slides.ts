@@ -36,6 +36,8 @@ export interface SlideData {
   note?: string
   periods?: Period[]
   references?: string[]
+  /** Презентацияны дайындағандар (титул слайдында көрсетіледі). */
+  authors?: string[]
 }
 
 export const PERIODS: Period[] = [
@@ -60,6 +62,7 @@ export const slides: SlideData[] = [
       text: '«Мезозой» атауын 1840 жылы ағылшын геологы Джон Филлипс ұсынған.',
     },
     note: 'Сахнада: Пангея заманындағы Жердің шартты бейнесі.',
+    authors: ['Ақжол Әйлеш', 'Тнибаева Жаннұр', 'Бекбердиева Ақбілек'],
   },
   {
     id: 2,

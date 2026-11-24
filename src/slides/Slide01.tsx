@@ -12,6 +12,19 @@ export default function Slide01() {
     <SlideShell slide={slide} hero>
       <Bullets items={slide.bullets} />
       <FactCard fact={slide.fact} />
+      {slide.authors && (
+        <motion.section variants={item}>
+          <h2 className="text-[10.5px] font-bold uppercase tracking-[0.2em] text-sand-300/80">Дайындағандар</h2>
+          <ul className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[13.5px] font-medium leading-snug text-white/85">
+            {slide.authors.map((name, i) => (
+              <li key={name} className="flex items-center gap-2">
+                {i > 0 && <span aria-hidden className="size-1 rounded-full bg-sand-300/60" />}
+                {name}
+              </li>
+            ))}
+          </ul>
+        </motion.section>
+      )}
       <motion.button
         variants={item}
         type="button"
