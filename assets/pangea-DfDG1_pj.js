@@ -1,4 +1,4 @@
-import{a as e,c as t,i as n,r,s as i}from"./SceneRig-BQc2AKGe.js";import{_ as a,_t as o,et as s,gt as c,lt as l,n as u,nt as d}from"./index-JeyG3EoH.js";var f=o(c()),p=parseInt(`187`.replace(/\D+/g,``)),m=class extends s{constructor(){super({uniforms:{time:{value:0},fade:{value:1}},vertexShader:`
+import{a as e,c as t,i as n,r,s as i}from"./SceneRig-DtAPf0M_.js";import{_ as a,_t as o,et as s,gt as c,lt as l,n as u,nt as d}from"./index-YVLct0kO.js";var f=o(c()),p=parseInt(`187`.replace(/\D+/g,``)),m=class extends s{constructor(){super({uniforms:{time:{value:0},fade:{value:1}},vertexShader:`
       uniform float time;
       attribute float size;
       varying vec3 vColor;

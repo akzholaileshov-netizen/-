@@ -1,4 +1,4 @@
-import{a as e,o as t,s as n}from"./SceneRig-BQc2AKGe.js";import{D as r,H as i,U as a,_ as o,_t as s,c,gt as l,i as u,lt as d,mt as f,n as p,tt as m,ut as h,v as g,y as _}from"./index-JeyG3EoH.js";import{a as v,i as y,n as b,r as x}from"./geo-_Oet0mXR.js";var S=s(l(),1);function C(e,t){e.onBeforeCompile=e=>{Object.assign(e.uniforms,t),e.vertexShader=e.vertexShader.replace(`#include <common>`,`#include <common>
+import{a as e,o as t,s as n}from"./SceneRig-DtAPf0M_.js";import{D as r,H as i,U as a,_ as o,_t as s,c,gt as l,i as u,lt as d,mt as f,n as p,tt as m,ut as h,v as g,y as _}from"./index-YVLct0kO.js";import{a as v,i as y,n as b,r as x}from"./geo-uzO9aheQ.js";var S=s(l(),1);function C(e,t){e.onBeforeCompile=e=>{Object.assign(e.uniforms,t),e.vertexShader=e.vertexShader.replace(`#include <common>`,`#include <common>
         uniform float uTime;
         uniform float uAge;
         uniform float uWind;

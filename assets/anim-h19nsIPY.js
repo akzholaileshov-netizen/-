@@ -1,0 +1,1 @@
+import{_t as e,c as t,gt as n,n as r}from"./index-YVLct0kO.js";var i=e(n(),1);function a(e=0){let n=(0,i.useRef)(t?e:0);return r((e,t)=>{n.current+=Math.min(t,.05)}),n}var o=e=>e<0?0:e>1?1:e;function s(e,t,n){let r=o((e-t)/(n-t));return r*r*(3-2*r)}function c(e,t=1.7){let n=o(e)-1;return 1+n*n*((t+1)*n+t)}export{s as n,a as r,c as t};
