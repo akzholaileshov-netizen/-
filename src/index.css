@@ -49,6 +49,8 @@ body {
   align-items: flex-end;
   padding: 56px 12px 78px;
   pointer-events: none;
+  /* Курсор параллаксі осы қабатты жылжытады (ScreenFX) */
+  will-change: transform;
 }
 
 .slide-panel {
@@ -106,15 +108,142 @@ body {
 
 /* ---------- Кинематографиялық виньетка ---------- */
 
+/* Жоғарғы және төменгі жолақтар мәтіннің оқылуы үшін әрдайым қараңғыланады.
+   Дөңгелек виньетканы әдетте post-processing салады; ол өшірулі (әлсіз құрылғы) кезде ғана CSS қосады. */
 .vignette {
   position: absolute;
   inset: 0;
   z-index: 5;
   pointer-events: none;
   background:
+    linear-gradient(to top, rgb(2 6 4 / 0.82), transparent 20%),
+    linear-gradient(to bottom, rgb(2 6 4 / 0.6), transparent 15%);
+}
+
+:root[data-fx='off'] .vignette {
+  background:
     radial-gradient(ellipse 85% 75% at 62% 46%, transparent 42%, rgb(2 6 4 / 0.6) 100%),
     linear-gradient(to top, rgb(2 6 4 / 0.82), transparent 20%),
     linear-gradient(to bottom, rgb(2 6 4 / 0.6), transparent 15%);
+}
+
+/* ---------- Сахна ауысқандағы қысқа перде ---------- */
+
+/* Камера ескі сахнадан ұшып шығып бара жатқанда ғана (ұшудың соңғы сәтінде) жабылады,
+   жаңа сахна дайын болғанда баяу ашылады — камера сол кезде алыстан ұшып келе жатады. */
+.stage-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse 90% 80% at 60% 45%, #0b1711 0%, var(--color-night) 72%);
+  opacity: 0;
+  transition: opacity 1s cubic-bezier(0.3, 0, 0.3, 1);
+}
+
+.stage-veil.is-leaving {
+  opacity: 1;
+  transition: opacity 0.22s ease-in 0.3s;
+}
+
+.stage-veil.is-loading {
+  opacity: 1;
+  transition: none;
+}
+
+.stage-veil > span {
+  opacity: 0;
+}
+
+/* Жүктелу созылып кетсе ғана индикатор көрінеді */
+.stage-veil.is-loading > span {
+  animation: pulse-dot 1.1s ease-in-out 0.7s infinite;
+}
+
+/* ---------- Толық экранды жарқыл (11-слайд): ақтан қызылға ---------- */
+
+.screen-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.screen-flash-white {
+  background: radial-gradient(ellipse at 62% 45%, #fffdf4 0%, #fff1cf 55%, #ffd9a0 100%);
+}
+
+.screen-flash-red {
+  background: radial-gradient(ellipse at 62% 45%, rgb(255 96 40 / 0.9) 0%, rgb(190 24 8 / 0.85) 60%, rgb(90 6 2 / 0.9) 100%);
+  mix-blend-mode: screen;
+}
+
+/* ---------- Титул тақырыбының артындағы жарық ---------- */
+
+.title-light {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 135%;
+  height: 300%;
+  translate: -50% -50%;
+  pointer-events: none;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgb(255 244 214 / 0.95) 0%, rgb(255 214 140 / 0.5) 26%, rgb(255 150 70 / 0.14) 52%, transparent 70%);
+  filter: blur(6px);
+  mix-blend-mode: screen;
+}
+
+/* ---------- Әдебиеттер тізімі: титр сияқты жоғары жылжиды (12-слайд) ---------- */
+
+.credits {
+  position: relative;
+  height: 8.4rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+}
+
+.credits-roll {
+  animation: credits-roll var(--credits-time, 46s) linear infinite;
+}
+
+.credits:hover .credits-roll,
+.credits:focus-within .credits-roll {
+  animation-play-state: paused;
+}
+
+/* Тізім екі рет қайталанған: жартысына жылжығанда басына үзіліссіз оралады */
+@keyframes credits-roll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+/* ---------- «Қозғалысты азайту» баптауы ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-veil.is-leaving {
+    transition: opacity 0.25s ease-in;
+  }
+  .stage-veil {
+    transition: opacity 0.4s ease-out;
+  }
+  .credits {
+    height: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .credits-roll {
+    animation: none;
+  }
+  .credits-roll > [aria-hidden='true'] {
+    display: none;
+  }
 }
 
 /* ---------- 3D сахнадағы жазулар (drei <Html>) ---------- */

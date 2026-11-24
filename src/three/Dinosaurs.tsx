@@ -1,7 +1,8 @@
 import { useFrame } from '@react-three/fiber'
 import type { ThreeElements } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
+import { REDUCED_MOTION } from '../fx'
 import { merge, place, tube, type TubeSpec, type V3 } from './geo'
 
 /**
@@ -42,16 +43,63 @@ function Skinned({ geo, roughness = 0.82 }: { geo: THREE.BufferGeometry; roughne
   )
 }
 
+/** Тыныс алу ырғағы (рад/с): көздің жарқырауы да осы ырғақпен соғады. */
+const BREATH_RATE = 1.5
+
+/**
+ * «Тірі» көз: тыныс ырғағымен бірге жарқырап-бәсеңдейді және анда-санда жыпылықтайды (қабағы жабылып-ашылады).
+ */
 function Eyes({ p, r, color = '#ffb347' }: { p: V3; r: number; color?: string }) {
+  const eyes = useRef<(THREE.Mesh | null)[]>([])
+  const phase = useMemo(() => Math.random() * 10, [])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const glow = 0.8 + 1.1 * (0.5 + 0.5 * Math.sin(t * BREATH_RATE))
+    const cycle = (t + phase) % 4.3
+    const lid = cycle < 0.18 ? Math.abs(cycle / 0.09 - 1) : 1
+    for (const eye of eyes.current) {
+      if (!eye) continue
+      eye.scale.y = 0.1 + 0.9 * lid
+      ;(eye.material as THREE.MeshStandardMaterial).emissiveIntensity = glow * lid
+    }
+  })
+
   return (
     <>
-      {[1, -1].map((side) => (
-        <mesh key={side} position={[p[0], p[1], p[2] * side]}>
+      {[1, -1].map((side, i) => (
+        <mesh
+          key={side}
+          position={[p[0], p[1], p[2] * side]}
+          ref={(el) => {
+            eyes.current[i] = el
+          }}
+        >
           <sphereGeometry args={[r, 10, 8]} />
           <meshStandardMaterial color="#120a04" emissive={color} emissiveIntensity={0.9} roughness={0.25} />
         </mesh>
       ))}
     </>
+  )
+}
+
+/**
+ * Тыныс алу: кеуде өз ортасынан (pivot) сәл кеңейіп, қайта тарылады — дем алған сайын бүйірі мен биіктігі ұлғаяды.
+ */
+function Breath({ pivot, amp = 0.04, children }: { pivot: V3; amp?: number; children: ReactNode }) {
+  const chest = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    // Дем алу — тез, дем шығару — баяу
+    const s = 0.5 + 0.5 * Math.sin(clock.elapsedTime * BREATH_RATE)
+    const k = amp * s * s * (REDUCED_MOTION ? 0.4 : 1)
+    chest.current?.scale.set(1 + k * 0.2, 1 + k, 1 + k * 1.25)
+  })
+  return (
+    <group position={pivot}>
+      <group ref={chest}>
+        <group position={[-pivot[0], -pivot[1], -pivot[2]]}>{children}</group>
+      </group>
+    </group>
   )
 }
 
@@ -311,7 +359,9 @@ function Theropod({ spec, ...props }: GroupProps & { spec: TheropodSpec }) {
   return (
     <group {...props}>
       <group ref={body}>
-        <Skinned geo={g.torso} />
+        <Breath pivot={spec.torso.points[Math.floor(spec.torso.points.length / 2)]}>
+          <Skinned geo={g.torso} />
+        </Breath>
         <group ref={tail} position={spec.tail.pivot}>
           <Skinned geo={g.tail} />
         </group>
@@ -468,7 +518,9 @@ export function Diplodocus(props: GroupProps) {
   return (
     <group {...props}>
       <group ref={body}>
-        <Skinned geo={g.torso} />
+        <Breath pivot={[0.1, 2.25, 0]} amp={0.035}>
+          <Skinned geo={g.torso} />
+        </Breath>
         <group ref={tail} position={DIPLO_TAIL_PIVOT}>
           <Skinned geo={g.tail} />
         </group>
@@ -611,7 +663,9 @@ export function Triceratops(props: GroupProps) {
   return (
     <group {...props}>
       <group ref={body}>
-        <Skinned geo={g.torso} />
+        <Breath pivot={[0.1, 1.62, 0]}>
+          <Skinned geo={g.torso} />
+        </Breath>
         <group ref={tail} position={TRIKE_TAIL_PIVOT}>
           <Skinned geo={g.tail} />
         </group>

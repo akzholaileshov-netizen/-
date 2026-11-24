@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useMemo, useRef } from 'react'
+import type * as THREE from 'three'
 import { Glow, SkyDome, Sun } from '../three/Atmos'
 import { Diplodocus } from '../three/Dinosaurs'
 import { Instanced } from '../three/Instanced'
 import { Terrain } from '../three/Kit'
+import { Motes } from '../three/Motes'
 import { mulberry32 } from '../three/noise'
-import { Particles } from '../three/Particles'
 import { coniferGeo, cycadGeo, fernGeo } from '../three/plants'
 import { SceneRig } from '../three/SceneRig'
 import type { V3 } from '../three/geo'
@@ -25,8 +27,9 @@ const CLEARING = [{ x: 0, z: 0, r: 5.6 }]
 const CAMERA: V3 = [11, 3.2, 13]
 const OPEN = toward(CAMERA, 1.05, 6.5)
 
-/** 5-слайд: юраның ылғалды қылқан жапырақты орманы және алаңқайдағы диплодок. */
+/** 5-слайд: юраның ылғалды қылқан жапырақты орманы және алаңқайдағы диплодок — тұман, жаңбыр, желмен тербелген ағаштар. */
 export default function JurassicScene() {
+  const mistGroup = useRef<THREE.Group>(null)
   const geo = useMemo(
     () => ({
       coniferA: coniferGeo(0, 3),
@@ -57,6 +60,17 @@ export default function JurassicScene() {
     })
   }, [])
 
+  useFrame(({ clock }, dt) => {
+    const t = clock.elapsedTime
+    mistGroup.current?.children.forEach((child, i) => {
+      const sprite = child as THREE.Sprite
+      // Желдің бағытымен жылжиды, сахна шетінен шыққаны қарсы беттен қайта кіреді
+      sprite.position.x += dt * (0.22 + (i % 3) * 0.07)
+      if (sprite.position.x > 15) sprite.position.x = -15
+      sprite.material.opacity = 0.075 * (0.7 + 0.5 * Math.sin(t * 0.35 + i * 1.7)) * (1 - Math.abs(sprite.position.x) / 15) * 1.6
+    })
+  })
+
   return (
     <>
       <SceneRig position={CAMERA} target={[0, 2.0, 0]} background={HORIZON} fog={0.04} autoRotate={0.26} />
@@ -67,19 +81,27 @@ export default function JurassicScene() {
 
       <Terrain spec={GROUND} h={h} />
 
-      <Instanced geometry={geo.coniferA} items={items.conifersA} castShadow receiveShadow />
-      <Instanced geometry={geo.coniferB} items={items.conifersB} castShadow receiveShadow />
-      <Instanced geometry={geo.cycad} items={items.cycads} castShadow />
-      <Instanced geometry={geo.fern} items={items.ferns} />
+      {/* Ағаштар мен папоротниктер желмен тербеледі: түбі орнында, ұшы көбірек қозғалады */}
+      <Instanced geometry={geo.coniferA} items={items.conifersA} castShadow receiveShadow wind={0.013} />
+      <Instanced geometry={geo.coniferB} items={items.conifersB} castShadow receiveShadow wind={0.011} />
+      <Instanced geometry={geo.cycad} items={items.cycads} castShadow wind={0.045} />
+      <Instanced geometry={geo.fern} items={items.ferns} wind={0.075} />
 
       <Diplodocus position={[0.5, h(0, 0), 0]} rotation={[0, 0.55, 0]} scale={0.6} />
 
-      {mist.map((m, i) => (
-        <Glow key={i} color="#bfe8d0" scale={[m.scale, m.scale * 0.45]} opacity={0.075} position={m.position} />
-      ))}
+      {/* Жер бауырлаған тұман шоғырлары баяу жылжып, қоюланып-сейіліп тұрады */}
+      <group ref={mistGroup}>
+        {mist.map((m, i) => (
+          <Glow key={i} color="#bfe8d0" scale={[m.scale, m.scale * 0.45]} opacity={0.075} position={m.position} />
+        ))}
+      </group>
+      <Motes kind="fog" count={12} box={[30, 3, 30]} position={[0, 1.6, 0]} color="#bfe8d0" color2="#8fc8b0" size={8} velocity={[0.32, 0, 0.12]} opacity={0.06} seed={13} />
+
+      {/* Жаңбыр: желмен қиғаш жауған тамшы сызықтары */}
+      <Motes kind="rain" count={900} box={[26, 12, 26]} position={[0, 6, 0]} color="#cfeee4" color2="#9fd0c8" velocity={[1.6, -15, 0.5]} seed={15} />
 
       {/* Тозаң мен ылғал тамшылары */}
-      <Particles count={680} box={[30, 9, 30]} position={[0, 4.2, 0]} color="#d6ffb8" size={0.065} velocity={[0.12, 0.05, 0.06]} wobble={0.35} twinkle={0.85} opacity={0.75} seed={12} />
+      <Motes count={420} box={[30, 9, 30]} position={[0, 4.2, 0]} color="#d6ffb8" size={0.065} velocity={[0.12, 0.05, 0.06]} wobble={0.35} twinkle={0.85} opacity={0.75} seed={12} />
     </>
   )
 }

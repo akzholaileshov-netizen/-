@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { Glow } from './Atmos'
 import { merge, paint, tube, type V3 } from './geo'
 import { fbm, lerp, mulberry32 } from './noise'
-import { Particles } from './Particles'
+import { Motes } from './Motes'
 
 type GroupProps = ThreeElements['group']
 
@@ -135,16 +135,20 @@ export function Volcano({ height = 3.4, radius = 3.2, ...props }: GroupProps & {
           <meshStandardMaterial color="#3b312c" roughness={1} flatShading transparent opacity={0} depthWrite={false} />
         </mesh>
       ))}
-      <Particles
+      {/* Кратерден атқылаған ұшқындар мен желмен ұшқан күл */}
+      <Motes
+        kind="spark"
         count={170}
         box={[radius * 0.9, 6, radius * 0.9]}
         position={[0, height + 2.6, 0]}
-        color="#ff9a4a"
-        size={0.09}
-        velocity={[0.1, 1.1, 0]}
+        color="#ff8a3a"
+        color2="#ffd890"
+        size={0.07}
+        velocity={[0.1, 1.3, 0]}
         wobble={0.25}
         seed={41}
       />
+      <Motes kind="ash" count={120} box={[radius * 3, 7, radius * 3]} position={[radius * 0.6, height + 1.5, 0]} color="#5a4c44" color2="#2c2420" velocity={[0.5, -0.25, 0.1]} seed={42} />
     </group>
   )
 }

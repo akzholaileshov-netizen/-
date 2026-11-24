@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import type { FocusItem } from '../data/slides'
 import { useStage } from '../store/stage'
-import { item } from './SlideShell'
+import { item, slideIn } from './SlideShell'
 
 /**
  * Таңдалатын тезистер: тезисті басқанда 3D-сахнадағы тиісті нысан алға шығады.
@@ -18,7 +18,7 @@ export function FocusList({ items }: { items: FocusItem[] }) {
         return (
           <motion.button
             key={it.name}
-            variants={item}
+            variants={slideIn}
             type="button"
             role="tab"
             aria-selected={active}

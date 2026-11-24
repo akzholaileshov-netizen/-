@@ -1,5 +1,5 @@
 import type { ThreeElements } from '@react-three/fiber'
-import { useMemo } from 'react'
+import { useMemo, type Ref } from 'react'
 import * as THREE from 'three'
 import { IS_TOUCH, useStage } from '../store/stage'
 import type { V3 } from './geo'
@@ -133,12 +133,14 @@ interface SunProps {
   intensity?: number
   /** Көлеңке камерасының жартылай өлшемі. */
   extent?: number
+  ref?: Ref<THREE.DirectionalLight>
 }
 
-export function Sun({ position, color = '#ffffff', intensity = 2.5, extent = 13 }: SunProps) {
+export function Sun({ position, color = '#ffffff', intensity = 2.5, extent = 13, ref }: SunProps) {
   const shadows = useStage((s) => s.quality > 0.4)
   return (
     <directionalLight
+      ref={ref}
       position={position}
       color={color}
       intensity={intensity}

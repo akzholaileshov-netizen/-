@@ -1,12 +1,17 @@
 import { PerformanceMonitor } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Suspense, useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import type * as THREE from 'three'
+import { FLIGHT, FORCED_QUALITY, REDUCED_MOTION, resetFx } from '../fx'
 import { panelSpan } from '../layout'
 import { registry } from '../slides'
 import { IS_TOUCH, QUALITY_LEVELS, useStage } from '../store/stage'
 
-const FADE_MS = 380
+/** Post-processing кітапханасы бөлек чанкта: әлсіз құрылғыда мүлде жүктелмейді. */
+const Effects = lazy(() => import('./Effects'))
+
+/** Камера ескі сахнадан ұшып шыққанша күтетін уақыт; содан кейін сахна алмасады. */
+const EXIT_MS = REDUCED_MOTION ? 280 : FLIGHT.exit * 1000
 
 /** Сахна толық жүктеліп, алғашқы кадрлары салынған соң хабар береді. */
 function Ready({ onReady }: { onReady: () => void }) {
@@ -48,21 +53,26 @@ function ViewOffset() {
 }
 
 /**
- * Барлық слайдқа ортақ жалғыз WebGL-канвас.
- * Слайд ауысқанда: қараңғы перде жабылады → сахна компоненті алмасады (lazy) → перде ашылады.
+ * Барлық слайдқа ортақ жалғыз WebGL-канвас. Бір мезетте тек бір сахна ғана жасалып тұрады:
+ * көрінбейтін слайдтардың сахналары unmount күйінде, яғни ештеңе есептемейді де, салмайды да.
+ *
+ * Слайд ауысқанда: камера ескі сахнадан ұшып шығады (SceneRig) → ұшудың ең жылдам сәтінде қысқа перде
+ * сахнаның алмасуын жасырады (lazy-жүктелу де осы кезде) → камера жаңа сахнаға алыстан ұшып келіп қонады.
  */
 export function Stage() {
   const index = useStage((s) => s.index)
+  const shown = useStage((s) => s.shown)
   const quality = useStage((s) => s.quality)
-  const [shown, setShown] = useState(index)
   const [ready, setReady] = useState(false)
+  const composer = quality >= QUALITY_LEVELS[1]
 
   useEffect(() => {
     if (index === shown) return
     const id = window.setTimeout(() => {
       setReady(false)
-      setShown(index)
-    }, FADE_MS)
+      resetFx()
+      useStage.getState().setShown(useStage.getState().index)
+    }, EXIT_MS)
     return () => window.clearTimeout(id)
   }, [index, shown])
 
@@ -73,8 +83,13 @@ export function Stage() {
     void registry[shown - 1]?.load()
   }, [ready, shown])
 
+  // Post-processing өшірулі кезде виньетканы CSS салады (index.css)
+  useEffect(() => {
+    document.documentElement.dataset.fx = composer ? 'on' : 'off'
+  }, [composer])
+
   const onReady = useCallback(() => setReady(true), [])
-  const veiled = !ready || index !== shown
+  const leaving = index !== shown
   const Scene = registry[shown].Scene
 
   return (
@@ -87,32 +102,34 @@ export function Stage() {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
         <ViewOffset />
-        {/* FPS төмендесе сапаны түсіреміз: бөлшектер, инстанстар, DPR, көлеңкелер азаяды */}
-        <PerformanceMonitor
-          ms={250}
-          iterations={8}
-          flipflops={3}
-          bounds={(rate) => (rate > 90 ? [50, 85] : [42, 57])}
-          onDecline={() => useStage.getState().lowerQuality()}
-          onIncline={() => useStage.getState().raiseQuality()}
-          onFallback={() => useStage.getState().setQuality(QUALITY_LEVELS[0])}
-        />
+        {/* FPS төмендесе сапаны түсіреміз: бөлшектер, инстанстар, DPR, көлеңкелер, post-processing азаяды */}
+        {FORCED_QUALITY === null && (
+          <PerformanceMonitor
+            ms={250}
+            iterations={8}
+            flipflops={3}
+            bounds={(rate) => (rate > 90 ? [50, 85] : [42, 57])}
+            onDecline={() => useStage.getState().lowerQuality()}
+            onIncline={() => useStage.getState().raiseQuality()}
+            onFallback={() => useStage.getState().settleQuality()}
+          />
+        )}
         <Suspense fallback={null}>
           <Scene key={shown} />
           <Ready key={`ready-${shown}`} onReady={onReady} />
         </Suspense>
+        {composer && (
+          <Suspense fallback={null}>
+            <Effects />
+          </Suspense>
+        )}
       </Canvas>
 
       <div
         aria-hidden
-        className={`pointer-events-none absolute inset-0 grid place-items-center bg-night transition-opacity ease-in-out ${
-          veiled ? 'opacity-100 duration-300' : 'opacity-0 duration-700'
-        }`}
+        className={`stage-veil ${!ready ? 'is-loading' : leaving ? 'is-leaving' : ''}`}
       >
-        <span
-          className="size-2 rounded-full bg-sand-300"
-          style={{ animation: 'pulse-dot 1.1s ease-in-out infinite' }}
-        />
+        <span className="size-2 rounded-full bg-sand-300" />
       </div>
     </div>
   )

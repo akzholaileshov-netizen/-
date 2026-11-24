@@ -1,14 +1,17 @@
-import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { REDUCED_MOTION } from '../fx'
+import { ramp, useAge } from '../three/anim'
 import { Glow, Sun } from '../three/Atmos'
-import { ammoniteGeo, merge, paint, tube } from '../three/geo'
+import { ammoniteGeo, merge, paint } from '../three/geo'
 import { Instanced } from '../three/Instanced'
 import { Label } from '../three/Kit'
+import { Motes } from '../three/Motes'
 import { mulberry32, noise3 } from '../three/noise'
-import { Particles } from '../three/Particles'
 import { grassGeo } from '../three/plants'
 import { SceneRig } from '../three/SceneRig'
+import { Skeleton } from '../three/Skeleton'
 import type { Item } from '../three/terrain'
 
 /* Жер қыртысының қимасы: ені W (x), тереңдігі D (z). */
@@ -208,27 +211,43 @@ function Pumpjack() {
   )
 }
 
-/** 10-слайд: жер қыртысының қимасы — юра көмірі мен мұнайы, қазбалар, Қаратау тақтасы. */
+/** Қиманың ашылуы: сканер сызығы TOP биіктігінен BOTTOM-ға дейін түседі (секунд — сахна ашылғаннан бері). */
+const REVEAL = { top: 0.46, bottom: -2.9, from: 1.2, to: 6.8 }
+/** Қаңқа жатқан тереңдік (юра құмтасы): сканер осы деңгейден өткенде сүйектер жарықтана бастайды. */
+const SKELETON_Y = -1.74
+/** Жазулар өз қабаты ашылғанда ғана шығады: [биіктігі]. */
+const LABEL_LEVELS = { chalk: 0.0, coal: -0.9, oil: -1.35, jura: -1.6 }
+
+/**
+ * 10-слайд: жер қыртысының қимасы — юра көмірі мен мұнайы, қазбалар, Қаратау тақтасы.
+ * Анимация: қабаттар жоғарыдан төмен қарай біртіндеп ашылады (жарық сканер сызығы түседі),
+ * юра қабатындағы динозавр қаңқасына жеткенде сүйектері құйрығынан басына қарай жарықтанады.
+ */
 export default function ResourcesScene() {
+  const gl = useThree((s) => s.gl)
   const slab = useRef<THREE.Group>(null)
   const drops = useRef<(THREE.Mesh | null)[]>([])
+  const scan = useRef<THREE.Group>(null)
+  const boneLight = useRef<THREE.PointLight>(null)
+  const glow = useRef(REDUCED_MOTION ? 2 : 0)
+  const reached = useRef<number | null>(null)
+  const age = useAge(60)
+  /** Ашылған тереңдік: осыдан төмендегі жазулар әлі көрсетілмейді. */
+  const [depth, setDepth] = useState(REDUCED_MOTION ? REVEAL.bottom : REVEAL.top)
+
+  // Кесу жазықтығы: y ≥ cut бөлігі ғана салынады
+  const clip = useMemo(() => [new THREE.Plane(new THREE.Vector3(0, 1, 0), REDUCED_MOTION ? 10 : -REVEAL.top)], [])
+  useEffect(() => {
+    gl.localClippingEnabled = true
+    return () => {
+      gl.localClippingEnabled = false
+    }
+  }, [gl])
 
   const geo = useMemo(
     () => ({
       layers: LAYERS.map((_, i) => layerGeo(i)),
       ammonite: ammoniteGeo('#e2cfa0', '#9a8358'),
-      bone: tube({
-        points: [
-          [-0.42, 0, 0],
-          [-0.3, 0, 0],
-          [0, 0.02, 0],
-          [0.3, 0, 0],
-          [0.42, 0, 0],
-        ],
-        radii: [0.085, 0.05, 0.04, 0.05, 0.085],
-        radial: 8,
-        color: '#eadfc4',
-      }),
       imprint: imprintGeo(),
       grass: grassGeo(6, '#8a8a42', '#d9c070', 0.32, 6),
     }),
@@ -257,6 +276,31 @@ export default function ResourcesScene() {
       slab.current.position.y = 2.75 + Math.sin(t * 0.7) * 0.12
       slab.current.rotation.y = 0.5 + Math.sin(t * 0.3) * 0.5
     }
+
+    // Стратиграфияның ашылуы: кесу жазықтығы мен сканер сызығы бірге төмен түседі
+    const a = age.current
+    const cut = THREE.MathUtils.lerp(REVEAL.top, REVEAL.bottom, ramp(a, REVEAL.from, REVEAL.to))
+    clip[0].constant = REDUCED_MOTION ? 10 : -cut
+    if (scan.current) {
+      const fade = 1 - ramp(a, REVEAL.to, REVEAL.to + 0.8)
+      scan.current.visible = fade > 0.01 && a > REVEAL.from - 0.3
+      scan.current.position.y = cut
+      scan.current.scale.setScalar(1 + (1 - fade) * 0.12)
+      scan.current.children.forEach((child) => {
+        const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial
+        material.opacity = (material.userData.base as number) * fade * (0.8 + 0.2 * Math.sin(t * 9))
+      })
+    }
+    // Жазуларды бір-бір деңгейден ашамыз (әр шекарадан өткенде ғана қайта рендер)
+    const step = Math.round(cut * 4) / 4
+    if (!REDUCED_MOTION && step < depth) setDepth(step)
+
+    // Қаңқа: сканер жеткен сәттен бастап жарық құйрықтан басқа қарай жүгіреді
+    if (!REDUCED_MOTION) {
+      if (reached.current === null && cut < SKELETON_Y) reached.current = a
+      glow.current = reached.current === null ? 0 : (a - reached.current) / 1.9
+    }
+    if (boneLight.current) boneLight.current.intensity = Math.min(1, glow.current) * (5 + Math.sin(t * 2.2) * 1.2)
     // Ұңғымамен көтерілген мұнай тамшылары
     drops.current.forEach((m, i) => {
       if (!m) return
@@ -277,19 +321,40 @@ export default function ResourcesScene() {
 
       {geo.layers.map((g, i) => (
         <mesh key={i} geometry={g} castShadow receiveShadow>
-          <meshStandardMaterial vertexColors roughness={i === 2 ? 0.35 : 0.92} metalness={i === 2 ? 0.35 : 0} />
+          <meshStandardMaterial vertexColors roughness={i === 2 ? 0.35 : 0.92} metalness={i === 2 ? 0.35 : 0} clippingPlanes={clip} />
         </mesh>
       ))}
+
+      {/* Сканер: қабаттарды ашып келе жатқан жарық жиектеме мен жұқа жарық жазықтық */}
+      <group ref={scan} visible={false}>
+        {(
+          [
+            [0, FRONT + 0.06, W + 0.24, 0.035],
+            [0, -FRONT - 0.06, W + 0.24, 0.035],
+            [W / 2 + 0.06, 0, 0.035, D + 0.24],
+            [-W / 2 - 0.06, 0, 0.035, D + 0.24],
+          ] as const
+        ).map(([x, z, sx, sz], i) => (
+          <mesh key={i} position={[x, 0, z]}>
+            <boxGeometry args={[sx, 0.035, sz]} />
+            <meshBasicMaterial color="#ffe2a0" transparent opacity={1} toneMapped={false} userData={{ base: 1 }} />
+          </mesh>
+        ))}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+          <planeGeometry args={[W + 0.1, D + 0.1]} />
+          <meshBasicMaterial color="#ffb860" transparent opacity={0.16} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} userData={{ base: 0.16 }} />
+        </mesh>
+      </group>
 
       {/* Мұнай: антиклиналь күмбезінің астындағы линза */}
       <mesh position={[WELL_X, oilY, 0]} scale={[1.35, 0.26, FRONT + 0.03]}>
         <sphereGeometry args={[1, 28, 16]} />
-        <meshStandardMaterial color="#0a0806" roughness={0.08} metalness={0.85} />
+        <meshStandardMaterial color="#0a0806" roughness={0.08} metalness={0.85} clippingPlanes={clip} />
       </mesh>
       {/* Ұңғыма оқпаны */}
       <mesh position={[WELL_X, (oilY + surfaceY) / 2, FRONT + 0.03]}>
         <cylinderGeometry args={[0.025, 0.025, surfaceY - oilY, 8]} />
-        <meshStandardMaterial color="#c8c8c0" roughness={0.3} metalness={0.8} />
+        <meshStandardMaterial color="#c8c8c0" roughness={0.3} metalness={0.8} clippingPlanes={clip} />
       </mesh>
       {[0, 1, 2, 3].map((i) => (
         <mesh
@@ -300,7 +365,7 @@ export default function ResourcesScene() {
           }}
         >
           <sphereGeometry args={[0.045, 10, 8]} />
-          <meshStandardMaterial color="#1a1206" emissive="#c79a45" emissiveIntensity={0.9} roughness={0.2} metalness={0.6} />
+          <meshStandardMaterial color="#1a1206" emissive="#c79a45" emissiveIntensity={0.9} roughness={0.2} metalness={0.6} clippingPlanes={clip} />
         </mesh>
       ))}
       <group position={[WELL_X, surfaceY, FRONT - 0.3]}>
@@ -313,27 +378,34 @@ export default function ResourcesScene() {
           [-2.2, 0.16, 0.3, 0.4],
           [2.9, 0.1, 0.2, 2.2],
           [-0.9, -0.44, 0.13, 1.1],
-          [-2.5, -1.45, 0.27, 3.0],
+          [3.0, -1.5, 0.24, 3.0],
         ] as const
       ).map(([x, y, s, r], i) => (
         <mesh key={i} geometry={geo.ammonite} position={[x, y, FRONT + 0.01]} rotation={[0, 0, r]} scale={s}>
-          <meshStandardMaterial vertexColors roughness={0.6} metalness={0.1} />
+          <meshStandardMaterial vertexColors roughness={0.6} metalness={0.1} clippingPlanes={clip} />
         </mesh>
       ))}
-      <mesh geometry={geo.bone} position={[-0.7, -1.5, FRONT + 0.02]} rotation={[0, 0, 0.3]} scale={0.8}>
-        <meshStandardMaterial vertexColors roughness={0.6} />
-      </mesh>
 
-      <Instanced geometry={geo.grass} items={grass} />
+      {/* Юра құмтасында жатқан динозавр қаңқасы: қиманың бетіне жабысып, жалпайып жатыр; сканер жеткенде жарықтанады */}
+      <group position={[-1.85, SKELETON_Y, FRONT + 0.07]} scale={[0.42, 0.42, 0.1]}>
+        <Skeleton glow={glow} scattered={false} castShadow={false} clippingPlanes={clip} rotation={[0, 0.4, 0]} />
+      </group>
+      <pointLight ref={boneLight} position={[-1.7, SKELETON_Y + 0.2, FRONT + 0.9]} color="#ffb060" intensity={0} distance={4} />
 
-      <Label position={[-3.0, -0.74, FRONT + 0.25]}>Көмір</Label>
-      <Label position={[WELL_X + 1.2, oilY - 0.35, FRONT + 0.25]}>Мұнай</Label>
-      <Label position={[W / 2 + 0.35, -1.4, 0.6]} tone="jungle">
-        Юра
-      </Label>
-      <Label position={[W / 2 + 0.35, 0.15, 0.6]} tone="jungle">
-        Бор
-      </Label>
+      <Instanced geometry={geo.grass} items={grass} wind={0.09} />
+
+      {depth <= LABEL_LEVELS.coal && <Label position={[-3.0, -0.74, FRONT + 0.25]}>Көмір</Label>}
+      {depth <= LABEL_LEVELS.oil && <Label position={[WELL_X + 1.2, oilY - 0.35, FRONT + 0.25]}>Мұнай</Label>}
+      {depth <= LABEL_LEVELS.jura && (
+        <Label position={[W / 2 + 0.35, -1.4, 0.6]} tone="jungle">
+          Юра
+        </Label>
+      )}
+      {depth <= LABEL_LEVELS.chalk && (
+        <Label position={[W / 2 + 0.35, 0.15, 0.6]} tone="jungle">
+          Бор
+        </Label>
+      )}
 
       {/* Қаратау: кеш юра көлінің тақтатасындағы птерозавр таңбасы */}
       <group ref={slab} position={[-2.9, 2.75, -0.3]} rotation={[-0.25, 0.5, 0.08]}>
@@ -352,7 +424,9 @@ export default function ResourcesScene() {
         </Label>
       </group>
 
-      <Particles count={300} box={[16, 9, 16]} position={[0, 0.5, 0]} color="#e9cf96" size={0.045} velocity={[0.04, 0.05, 0]} wobble={0.3} twinkle={0.85} seed={27} />
+      <Motes count={300} box={[16, 9, 16]} position={[0, 0.5, 0]} color="#e9cf96" size={0.045} velocity={[0.04, 0.05, 0]} wobble={0.3} twinkle={0.85} seed={27} />
+      {/* Қима астындағы лавадан көтерілген ұшқындар */}
+      <Motes kind="spark" count={90} box={[9, 3, 6]} position={[0, -3.6, 0]} color="#ff8a4a" color2="#ffd08a" size={0.04} velocity={[0.04, 0.5, 0]} seed={28} />
     </>
   )
 }

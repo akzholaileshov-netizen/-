@@ -1,13 +1,15 @@
-import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { ambience } from '../audio/ambience'
+import { REDUCED_MOTION, fx, resetFx } from '../fx'
 import { useStage } from '../store/stage'
 import { Glow, SkyDome, Sun } from '../three/Atmos'
 import { TRex } from '../three/Dinosaurs'
 import { Instanced } from '../three/Instanced'
 import { Terrain } from '../three/Kit'
+import { Motes } from '../three/Motes'
 import { clamp01, mulberry32, smoothstep } from '../three/noise'
-import { Particles } from '../three/Particles'
 import { coniferGeo, fernGeo, rockGeo } from '../three/plants'
 import { SceneRig } from '../three/SceneRig'
 import type { V3 } from '../three/geo'
@@ -26,9 +28,14 @@ const GROUND: TerrainSpec = {
 }
 const h = heightFn(GROUND)
 
-/* Анимация кестесі (секунд) */
-const CYCLE = 13
-const IMPACT_AT = 4.8
+/*
+ * Анимация кестесі (секунд, сахна ашылған немесе «қайта көрсету» басылған сәттен).
+ * Бір рет ойналады: астероид ұшып келеді → соқтығысу (жарқыл, соққы толқыны, сілкініс) → қараңғылық пен тыныштық.
+ */
+const FLY_FROM = 0.9
+const IMPACT_AT = 5.4
+/** Соқтығысудан кейін аспанның күл басып қараңғылануы: [басы, соңы]. */
+const DUSK: [number, number] = [0.9, 7.5]
 const TRAIL = 9
 const DEBRIS = 70
 const GRAVITY = -7.5
@@ -41,11 +48,70 @@ const VOLCANO: [number, number] = [-7.5, -4.5]
 const REX: [number, number] = [-1.2, 2.6]
 const CAMERA: V3 = [11.5, 4.4, 13.5]
 
-/** 11-слайд: Чиксулуб соқтығысуы — астероидтың құлауы, жарқыл, соққы толқыны, жанартау. */
+/**
+ * Жарылыс материалы: камераға қараған бетіне байланысты жарқырайтын мөлдір шар.
+ * rim = false — ортасы ақ-сары, шеті қызғылт жұмсақ от шары; rim = true — тек жиегі көрінетін соққы күмбезі.
+ */
+function blastMaterial(rim: boolean) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: rim ? THREE.DoubleSide : THREE.FrontSide,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uOpacity: { value: 0 }, uTime: { value: 0 } },
+    vertexShader: /* glsl */ `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      varying vec3 vPos;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vView = normalize(-mv.xyz);
+        vPos = position;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uOpacity;
+      uniform float uTime;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      varying vec3 vPos;
+      void main() {
+        float f = abs(dot(normalize(vNormal), normalize(vView)));
+        ${
+          rim
+            ? `float a = pow(1.0 - f, 2.6);
+               vec3 col = vec3(1.0, 0.74, 0.5);`
+            : `float boil = 0.82 + 0.18 * sin(vPos.x * 7.0 + uTime * 3.1) * sin(vPos.y * 6.0 - uTime * 2.3) * sin(vPos.z * 8.0 + uTime * 1.7);
+               float a = smoothstep(0.0, 0.75, f) * boil;
+               vec3 col = mix(vec3(1.0, 0.3, 0.06), vec3(1.0, 0.92, 0.66), pow(f, 2.2));`
+        }
+        gl_FragColor = vec4(col, a * uOpacity);
+      }
+    `,
+  })
+}
+
+const FOG_DAY = new THREE.Color(HORIZON)
+const FOG_NIGHT = new THREE.Color('#120706')
+
+/**
+ * 11-слайд: Чиксулуб соқтығысуы.
+ * Астероид отты із қалдырып ұшып келеді → жерге соғылған сәтте экран ақ-қызыл жарқылға толып, сілкінеді,
+ * соққы толқыны кескінді сындырып тарайды → аспанды күл басып, сахна қараңғы тыныштыққа батады.
+ * Тізбек бір рет ойналады; «Соқтығысуды қайта көрсету» түймесі оны басынан бастайды.
+ */
 export default function ExtinctionScene() {
   const replay = useStage((s) => s.replay)
   const seenReplay = useRef(replay)
-  const t0 = useRef<number | null>(null)
+  const scene = useThree((s) => s.scene)
+  const age = useRef(0)
+  const struck = useRef(false)
+  const fogBase = useRef<number | null>(null)
+  /** Күл мен шоқтың қоюлығы (Motes осыдан оқиды). */
+  const ashLevel = useRef(0.3)
+  const emberLevel = useRef(0)
 
   const world = useRef<THREE.Group>(null)
   const asteroid = useRef<THREE.Group>(null)
@@ -54,9 +120,25 @@ export default function ExtinctionScene() {
   const scar = useRef<THREE.Sprite>(null)
   const fireball = useRef<THREE.Mesh>(null)
   const ring = useRef<THREE.Mesh>(null)
+  const dustRing = useRef<THREE.Mesh>(null)
+  const dome = useRef<THREE.Mesh>(null)
+  const pall = useRef<THREE.Mesh>(null)
   const debris = useRef<THREE.InstancedMesh>(null)
   const light = useRef<THREE.PointLight>(null)
   const hemi = useRef<THREE.HemisphereLight>(null)
+  const sun = useRef<THREE.DirectionalLight>(null)
+
+  // Сахнадан шыққанда экрандық әсерлер (жарқыл, сілкініс) қалып қоймасын
+  useEffect(() => () => resetFx(), [])
+
+  const mats = useMemo(() => ({ fireball: blastMaterial(false), dome: blastMaterial(true) }), [])
+  useEffect(
+    () => () => {
+      mats.fireball.dispose()
+      mats.dome.dispose()
+    },
+    [mats],
+  )
 
   const geo = useMemo(
     () => ({
@@ -99,26 +181,43 @@ export default function ExtinctionScene() {
 
   const tmp = useMemo(() => ({ o: new THREE.Object3D(), p: new THREE.Vector3() }), [])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const now = clock.elapsedTime
-    if (t0.current === null || seenReplay.current !== replay) {
+    if (seenReplay.current !== replay) {
       seenReplay.current = replay
-      t0.current = now
+      age.current = 0
+      struck.current = false
     }
-    const t = (now - t0.current) % CYCLE
+    age.current += Math.min(delta, 0.05)
+    const t = age.current
     const flying = t < IMPACT_AT
     const a = t - IMPACT_AT // соқтығысудан кейін өткен уақыт
+    const hit = a >= 0
+    const approach = clamp01((t - FLY_FROM) / (IMPACT_AT - FLY_FROM))
     const ease = (k: number) => k * k * (1.6 - 0.6 * k) // үдей түсетін қозғалыс
+
+    // Соқтығысу сәті: дыбыс (қосулы болса) бір рет ойналады
+    if (hit && !struck.current) {
+      struck.current = true
+      ambience.impact(11)
+    }
+
+    // Экрандық әсерлер: жарқыл (ақ → қызыл), сілкініс, кескінді сындыратын соққы толқыны
+    fx.flash = hit ? Math.exp(-a * 1.05) : 0
+    fx.shake = REDUCED_MOTION ? 0 : hit ? Math.exp(-a * 0.85) * (a < 6 ? 1 : 0) : 0.07 * approach * approach
+    fx.shockAt.copy(IMPACT)
+    fx.shock = hit && a < 1.9 ? a / 1.9 : -1
 
     // Астероид пен оның отты ізі
     if (asteroid.current) {
-      asteroid.current.visible = flying
-      asteroid.current.position.lerpVectors(START, IMPACT, ease(clamp01(t / IMPACT_AT)))
+      asteroid.current.visible = flying && t > FLY_FROM
+      asteroid.current.position.lerpVectors(START, IMPACT, ease(approach))
       asteroid.current.rotation.set(now * 1.3, now * 0.9, 0)
+      asteroid.current.scale.setScalar(1 + approach * 0.5)
     }
     trail.current.forEach((s, i) => {
       if (!s) return
-      const k = clamp01((t - i * 0.075) / IMPACT_AT)
+      const k = clamp01((t - FLY_FROM - i * 0.075) / (IMPACT_AT - FLY_FROM))
       const fade = 1 - i / TRAIL
       s.visible = flying && k > 0
       s.position.lerpVectors(START, IMPACT, ease(k))
@@ -127,7 +226,6 @@ export default function ExtinctionScene() {
     })
 
     // Жарқыл, от шары, соққы толқыны
-    const hit = a >= 0
     if (flash.current) {
       flash.current.visible = hit && a < 1.6
       flash.current.scale.setScalar(8 + a * 34)
@@ -137,22 +235,52 @@ export default function ExtinctionScene() {
       const s = hit ? 0.6 + (1 - Math.exp(-a * 1.7)) * 3.8 : 0.001
       fireball.current.visible = hit && a < 5
       fireball.current.scale.set(s, s * 0.8, s)
-      ;(fireball.current.material as THREE.MeshBasicMaterial).opacity = clamp01(1.1 - a / 4.6)
+      mats.fireball.uniforms.uOpacity.value = clamp01(1.1 - a / 4.6)
+      mats.fireball.uniforms.uTime.value = now
     }
     if (ring.current) {
-      ring.current.visible = hit && a < 4
-      ring.current.scale.setScalar(0.6 + a * 4.6)
-      ;(ring.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.85 - a / 4.4)
+      // Жер бетімен тараған от сақинасы
+      ring.current.visible = hit && a < 3.2
+      ring.current.scale.setScalar(0.6 + a * 9.5)
+      ;(ring.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 - a / 3.2)
+    }
+    if (dustRing.current) {
+      // Оның соңынан баяу жылжитын шаң толқыны
+      dustRing.current.visible = hit && a < 6
+      dustRing.current.scale.setScalar(0.5 + a * 4.2)
+      ;(dustRing.current.material as THREE.MeshBasicMaterial).opacity = hit ? 0.5 * clamp01(a * 3) * clamp01(1 - a / 6) : 0
+    }
+    if (dome.current) {
+      // Ауадағы соққы күмбезі
+      const s = 1 + a * 12
+      dome.current.visible = hit && a < 2.4
+      dome.current.scale.setScalar(s)
+      mats.dome.uniforms.uOpacity.value = hit ? 0.9 * clamp01(1 - a / 2.4) ** 2 : 0
     }
     if (scar.current) {
+      // Кратердің шоғы: ұзақ уақыт бойы баяу жыпылықтап жатады
       scar.current.visible = hit
-      scar.current.material.opacity = hit ? 0.85 * Math.exp(-a * 0.32) * (1 - smoothstep(CYCLE - 1.5, CYCLE, t)) : 0
+      scar.current.material.opacity = hit ? 0.85 * Math.exp(-a * 0.32) + 0.16 * (0.75 + 0.25 * Math.sin(now * 1.7)) : 0
     }
     if (light.current) {
       light.current.position.copy(flying && asteroid.current ? asteroid.current.position : IMPACT)
       light.current.position.y += 0.8
-      light.current.intensity = hit ? 2600 * Math.exp(-a * 1.5) + 60 * Math.exp(-a * 0.3) : 30 + 90 * clamp01(t / IMPACT_AT)
+      light.current.intensity = hit ? 2600 * Math.exp(-a * 1.5) + 60 * Math.exp(-a * 0.3) + 9 : 30 + 190 * approach * approach
     }
+
+    // Тыныштық: аспанды күл басады, күн көмескіленеді, тұман қоюланады
+    const dusk = hit ? smoothstep(DUSK[0], DUSK[1], a) : 0
+    if (hemi.current) hemi.current.intensity = THREE.MathUtils.lerp(0.75, 0.24, dusk)
+    if (sun.current) sun.current.intensity = THREE.MathUtils.lerp(2.0, 0.3, dusk)
+    if (pall.current) (pall.current.material as THREE.MeshBasicMaterial).opacity = dusk * 0.72
+    const fog = scene.fog as THREE.FogExp2 | null
+    if (fog) {
+      fogBase.current ??= fog.density
+      fog.density = fogBase.current * (1 + dusk * 1.1)
+      fog.color.copy(FOG_DAY).lerp(FOG_NIGHT, dusk)
+    }
+    ashLevel.current = 0.3 + 0.7 * (hit ? smoothstep(0.6, 5, a) : 0)
+    emberLevel.current = hit ? smoothstep(0.1, 0.9, a) * (0.25 + 0.75 * Math.exp(-a * 0.22)) : 0
 
     // Сынықтар: баллистикалық траектория
     const mesh = debris.current
@@ -172,14 +300,10 @@ export default function ExtinctionScene() {
       mesh.instanceMatrix.needsUpdate = true
     }
 
-    // Жер сілкінісі мен шаңнан қараңғылану
+    // Жердің өзі де дірілдейді (камера сілкінісіне қосымша)
     if (world.current) {
-      const amp = hit ? 0.2 * Math.exp(-a * 1.9) : 0
+      const amp = hit && !REDUCED_MOTION ? 0.16 * Math.exp(-a * 1.6) : 0
       world.current.position.set(Math.sin(now * 53) * amp, Math.sin(now * 61) * amp, Math.sin(now * 47) * amp)
-    }
-    if (hemi.current) {
-      const dusk = hit ? smoothstep(0.5, 4, a) * (1 - smoothstep(CYCLE - 1.5, CYCLE, t)) : 0
-      hemi.current.intensity = THREE.MathUtils.lerp(0.75, 0.28, dusk)
     }
   })
 
@@ -187,9 +311,14 @@ export default function ExtinctionScene() {
     <>
       <SceneRig position={CAMERA} target={[0, 2.4, 0]} background={HORIZON} fog={0.022} autoRotate={0.1} polar={[0.85, 1.55]} />
       <SkyDome top="#090405" bottom={HORIZON} sun={[0.5, 0.35, -0.8]} sunColor="#ff9a5a" sunPower={0.5} />
+      {/* Күл пердесі: соқтығысудан кейін аспанды біртіндеп жабады */}
+      <mesh ref={pall} renderOrder={-9} frustumCulled={false}>
+        <sphereGeometry args={[120, 24, 12]} />
+        <meshBasicMaterial color="#070304" transparent opacity={0} side={THREE.BackSide} depthWrite={false} fog={false} />
+      </mesh>
 
       <hemisphereLight ref={hemi} args={['#ff9f70', '#1a0806', 0.75]} />
-      <Sun position={[6, 10, 8]} color="#ffb48c" intensity={2.0} extent={18} />
+      <Sun ref={sun} position={[6, 10, 8]} color="#ffb48c" intensity={2.0} extent={18} />
 
       <group ref={world}>
         <Terrain spec={GROUND} h={h} />
@@ -209,9 +338,15 @@ export default function ExtinctionScene() {
           <ringGeometry args={[0.86, 1, 72]} />
           <meshBasicMaterial color="#ffd9a8" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </mesh>
-        <mesh ref={fireball} position={IMPACT} visible={false}>
-          <sphereGeometry args={[1, 28, 18]} />
-          <meshBasicMaterial color="#ffb057" transparent opacity={0} depthWrite={false} toneMapped={false} />
+        <mesh ref={dustRing} position={[IMPACT.x, 0.4, IMPACT.z]} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+          <ringGeometry args={[0.62, 1, 72]} />
+          <meshBasicMaterial color="#7a5a48" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+        <mesh ref={dome} position={IMPACT} visible={false} material={mats.dome}>
+          <sphereGeometry args={[1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        </mesh>
+        <mesh ref={fireball} position={IMPACT} visible={false} material={mats.fireball}>
+          <sphereGeometry args={[1, 32, 20]} />
         </mesh>
         <instancedMesh ref={debris} args={[geo.debris, undefined, DEBRIS]} frustumCulled={false}>
           <meshStandardMaterial color="#2a1a12" emissive="#ff5a1f" emissiveIntensity={1.6} roughness={0.8} flatShading />
@@ -239,8 +374,10 @@ export default function ExtinctionScene() {
       <Glow ref={flash} color="#fff1d0" scale={8} opacity={0} position={[IMPACT.x, 1.5, IMPACT.z]} visible={false} />
       <pointLight ref={light} color="#ff8a4a" intensity={30} distance={60} decay={2} />
 
-      {/* Аспаннан жауған күл */}
-      <Particles count={760} box={[32, 12, 32]} position={[0, 5.5, 0]} color="#ffb08a" size={0.055} velocity={[0.3, -0.4, 0.12]} wobble={0.3} twinkle={0.5} opacity={0.7} seed={29} />
+      {/* Аспаннан жауған күл: соқтығысудан кейін қоюлана түседі */}
+      <Motes count={900} box={[32, 12, 32]} position={[0, 5.5, 0]} color="#8f7f78" color2="#d8c4b4" size={0.075} velocity={[0.3, -0.55, 0.12]} wobble={0.35} twinkle={0.25} opacity={0.75} blending="normal" level={ashLevel} seed={29} />
+      {/* Жарылыстан шашыраған шоқтар */}
+      <Motes kind="spark" count={420} box={[26, 10, 26]} position={[IMPACT.x, 5, IMPACT.z]} color="#ff7a2a" color2="#ffd08a" size={0.055} velocity={[0.5, 0.9, 0.2]} level={emberLevel} seed={30} />
     </>
   )
 }

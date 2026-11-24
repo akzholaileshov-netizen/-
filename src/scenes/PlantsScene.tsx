@@ -5,10 +5,11 @@ import { useStage } from '../store/stage'
 import { Glow, SkyDome, Sun } from '../three/Atmos'
 import { Instanced } from '../three/Instanced'
 import { Swap, Terrain } from '../three/Kit'
+import { Motes } from '../three/Motes'
 import { mulberry32 } from '../three/noise'
-import { Particles } from '../three/Particles'
 import { coniferGeo, cycadGeo, fernGeo, flowerGeo, grassGeo } from '../three/plants'
 import { SceneRig } from '../three/SceneRig'
+import { UnfurlFern } from '../three/Unfurl'
 import { heightFn, scatter, type TerrainSpec } from '../three/terrain'
 
 const HORIZON = '#0a2a1c'
@@ -31,14 +32,13 @@ function Specimen({ geometry, scale }: { geometry: THREE.BufferGeometry; scale: 
   )
 }
 
-/** 9-слайд: мезозой флорасының төрт тобы; таңдалған өсімдік ортаға шығады. */
+/** 9-слайд: мезозой флорасының төрт тобы; таңдалған өсімдік ортаға шығады, папоротниктің вайялары біртіндеп жайылады. */
 export default function PlantsScene() {
   const focus = useStage((s) => s.focus)
   const sway = useRef<THREE.Group>(null)
 
   const geo = useMemo(
     () => ({
-      fern: fernGeo(1),
       cycad: cycadGeo(2),
       conifer: coniferGeo(0, 3),
       flower: flowerGeo(4),
@@ -89,12 +89,14 @@ export default function PlantsScene() {
         <meshStandardMaterial color="#e2c07a" emissive="#c79a45" emissiveIntensity={1.2} />
       </mesh>
 
-      <Instanced geometry={geo.smallFern} items={items.ferns} />
-      <Instanced geometry={geo.grass} items={items.grass} />
+      {/* Айналадағы папоротниктер мен шөп ортадан шетке қарай толқынмен өсіп шығады, кейін желмен тербеледі */}
+      <Instanced geometry={geo.smallFern} items={items.ferns} wind={0.07} grow={{ start: 0.9, spread: 0.3, time: 2.2, twist: 1.6 }} />
+      <Instanced geometry={geo.grass} items={items.grass} wind={0.09} grow={{ start: 0.5, spread: 0.22, time: 1.4, twist: 0.8 }} />
 
       <group ref={sway}>
+        {/* Басты папоротник: вайялары ұлу тәрізді оралған күйден біртіндеп жайылады */}
         <Swap active={focus === 0}>
-          <Specimen geometry={geo.fern} scale={2.4} />
+          <UnfurlFern active={focus === 0} scale={2.4} />
         </Swap>
         <Swap active={focus === 1}>
           <Specimen geometry={geo.cycad} scale={1.7} />
@@ -117,8 +119,10 @@ export default function PlantsScene() {
         return <Glow key={i} color="#bfe8d0" scale={[9, 3.6]} opacity={0.07} position={[Math.cos(a) * 5.5, 0.8, Math.sin(a) * 5.5]} />
       })}
 
-      {/* Жылтырақ тозаң */}
-      <Particles count={340} box={[15, 6, 15]} position={[0, 2.8, 0]} color="#e8ffb0" size={0.06} velocity={[0.03, 0.04, 0.02]} wobble={0.45} twinkle={0.95} seed={23} />
+      {/* Жылтырақ споралар мен тозаң, жер бауырлаған тұман */}
+      <Motes count={340} box={[15, 6, 15]} position={[0, 2.8, 0]} color="#e8ffb0" size={0.06} velocity={[0.03, 0.04, 0.02]} wobble={0.45} twinkle={0.95} seed={23} />
+      <Motes count={140} box={[5, 3.4, 5]} position={[0, 1.9, 0]} color="#fff3b0" color2="#b8ff9a" size={0.04} velocity={[0, 0.16, 0]} wobble={0.3} twinkle={0.9} seed={24} />
+      <Motes kind="fog" count={8} box={[16, 1.2, 16]} position={[0, 0.8, 0]} color="#bfe8d0" size={6} velocity={[0.18, 0, 0.07]} opacity={0.045} seed={25} />
     </>
   )
 }

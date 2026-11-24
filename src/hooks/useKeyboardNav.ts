@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { TOTAL, useStage } from '../store/stage'
 import { toggleFullscreen } from './useFullscreen'
 
-/** ← → (сондай-ақ PageUp/PageDown, Space, Home/End) — слайд ауыстыру, F — толық экран. */
+/** ← → (сондай-ақ PageUp/PageDown, Space, Home/End) — слайд ауыстыру, F — толық экран, M — дыбыс. */
 export function useKeyboardNav() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -34,6 +34,9 @@ export function useKeyboardNav() {
           break
         case 'KeyF':
           toggleFullscreen()
+          break
+        case 'KeyM':
+          useStage.getState().toggleSound()
           break
         default:
           return

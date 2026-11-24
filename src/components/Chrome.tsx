@@ -38,6 +38,8 @@ export function Header() {
           <span className="mr-2">слайд</span>
           <Kbd>F</Kbd>
           <span className="mr-2">толық экран</span>
+          <Kbd>M</Kbd>
+          <span className="mr-2">дыбыс</span>
           <span>тышқанмен сүйреу — сахнаны айналдыру</span>
         </div>
       )}
@@ -51,18 +53,23 @@ interface RoundButtonProps {
   label: string
   onClick: () => void
   disabled?: boolean
+  /** Қосқыш түйме үшін: қосулы күйі. */
+  pressed?: boolean
   children: ReactNode
 }
 
-function RoundButton({ label, onClick, disabled, children }: RoundButtonProps) {
+function RoundButton({ label, onClick, disabled, pressed, children }: RoundButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-pressed={pressed}
       title={label}
       onClick={onClick}
       disabled={disabled}
-      className="glass-chip grid size-10 shrink-0 cursor-pointer place-items-center rounded-full text-white/80 transition hover:border-white/30 hover:text-white focus-visible:outline-2 focus-visible:outline-sand-300 active:scale-95 disabled:cursor-default disabled:opacity-30 disabled:hover:border-white/10"
+      className={`glass-chip grid size-10 shrink-0 cursor-pointer place-items-center rounded-full transition hover:border-white/30 hover:text-white focus-visible:outline-2 focus-visible:outline-sand-300 active:scale-95 disabled:cursor-default disabled:opacity-30 disabled:hover:border-white/10 ${
+        pressed ? 'border-sand-300/60 text-sand-300' : 'text-white/80'
+      }`}
     >
       {children}
     </button>
@@ -80,6 +87,8 @@ export function Footer() {
   const go = useStage((s) => s.go)
   const next = useStage((s) => s.next)
   const prev = useStage((s) => s.prev)
+  const sound = useStage((s) => s.sound)
+  const toggleSound = useStage((s) => s.toggleSound)
   const fullscreen = useFullscreen()
 
   return (
@@ -131,6 +140,11 @@ export function Footer() {
 
         <RoundButton label="Келесі слайд (→)" onClick={next} disabled={index === TOTAL - 1}>
           <Icon d="M9 5l7 7-7 7" />
+        </RoundButton>
+
+        {/* Әдепкіде дыбыссыз: орта шуы (жел, жанартау гүрілі, жаңбыр, теңіз) осы түймемен қосылады */}
+        <RoundButton label={sound ? 'Дыбысты өшіру (M)' : 'Орта шуын қосу: жел, жанартау гүрілі (M)'} onClick={toggleSound} pressed={sound}>
+          <Icon d={sound ? 'M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4zM15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11' : 'M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4zM16 9.5l4.5 5M20.5 9.5l-4.5 5'} />
         </RoundButton>
 
         {fullscreen.supported && (

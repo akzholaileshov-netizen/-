@@ -1,12 +1,14 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import * as THREE from 'three'
 import { PERIODS } from '../data/slides'
+import { PERIOD_IGNITE, REDUCED_MOTION } from '../fx'
+import { overshoot, ramp, useAge } from '../three/anim'
 import { Glow, Sun } from '../three/Atmos'
 import { ammoniteGeo, merge, paint } from '../three/geo'
 import { Label } from '../three/Kit'
 import { fbm, mulberry32, noise3 } from '../three/noise'
-import { Particles } from '../three/Particles'
+import { Motes } from '../three/Motes'
 import { SceneRig } from '../three/SceneRig'
 
 const RADIUS = 2.15
@@ -47,6 +49,7 @@ function layerGeo(y0: number, height: number, color: string, seed: number) {
 interface Layer {
   name: string
   label: string
+  color: string
   y0: number
   height: number
   geo: THREE.BufferGeometry
@@ -61,6 +64,7 @@ function buildColumn() {
     const layer: Layer = {
       name: p.name,
       label: `${p.name} · ≈${p.from - p.to} млн жыл`,
+      color: p.color,
       y0: y,
       height,
       geo: layerGeo(y, height, ['#a44a2e', '#2f6a45', '#d6c08a'][i], 11 + i * 5),
@@ -77,6 +81,7 @@ function buildColumn() {
       const fy = layer.y0 + layer.height * (0.3 + rnd() * 0.4)
       const r = rimRadius(angle, fy) + 0.02
       return {
+        layer: li,
         position: [Math.cos(angle) * r, fy, Math.sin(angle) * r] as [number, number, number],
         rotation: [0, Math.PI / 2 - angle, rnd() * 6] as [number, number, number],
         scale: Math.min(0.2 + rnd() * 0.16, layer.height * 0.36),
@@ -86,13 +91,77 @@ function buildColumn() {
   return { base, layers, fossils, top: y - GAP }
 }
 
-/** 2-слайд: мезозойдың «қабатты бағанасы» — триас, юра және бор шөгінділері. */
+/** Сахна слайдтан сәл кейін ашылады (камераның ұшып шығуы), сондықтан HTML шкаласымен қатар жануы үшін ертерек бастаймыз. */
+const SCENE_LAG = 0.55
+
+interface StratumProps {
+  layer: Layer
+  index: number
+  age: RefObject<number>
+  children: ReactNode
+}
+
+/**
+ * Бір кезеңнің қабаты: өз кезегі келгенде табанынан жоғары қарай «өсіп» шығады, кезең түсімен жарқ етіп жанады,
+ * шекара сақинасы ашылады, содан кейін жазуы пайда болады.
+ */
+function Stratum({ layer, index, age, children }: StratumProps) {
+  const body = useRef<THREE.Group>(null)
+  const ring = useRef<THREE.Mesh>(null)
+  const [lit, setLit] = useState(REDUCED_MOTION)
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, emissive: new THREE.Color(layer.color), emissiveIntensity: 0 }),
+    [layer.color],
+  )
+  useEffect(() => () => material.dispose(), [material])
+
+  useFrame(() => {
+    const t = age.current - (PERIOD_IGNITE[index] - SCENE_LAG)
+    const g = body.current
+    if (g) {
+      g.visible = t > 0
+      g.scale.y = Math.max(0.001, overshoot(t / 0.8, 1.4))
+    }
+    // Тұтану жарқылы: кезең түсімен жарқ етеді де, баяу сөнеді (Bloom күшейтеді)
+    material.emissiveIntensity = t > 0 ? 1.5 * Math.exp(-t * 2.4) : 0
+    const r = ring.current
+    if (r) {
+      const k = ramp(t, 0, 0.7)
+      r.visible = t > 0
+      r.scale.setScalar(0.6 + 0.4 * k)
+      ;(r.material as THREE.MeshBasicMaterial).opacity = 0.55 + 0.45 * Math.exp(-Math.max(t, 0) * 2)
+    }
+    if (!lit && t > 0.55) setLit(true)
+  })
+
+  return (
+    <>
+      <group position={[0, layer.y0, 0]}>
+        <group ref={body} visible={false}>
+          <group position={[0, -layer.y0, 0]}>
+            <mesh geometry={layer.geo} material={material} castShadow receiveShadow />
+            {children}
+          </group>
+        </group>
+      </group>
+      {lit && <Label position={[0, layer.y0 + layer.height / 2, 0]}>{layer.label}</Label>}
+      {/* Кезеңдер арасындағы шекараны белгілейтін алтын сақина */}
+      <mesh ref={ring} position={[0, layer.y0 - GAP / 2, 0]} rotation={[Math.PI / 2, 0, 0]} visible={false}>
+        <torusGeometry args={[RADIUS * 1.12, 0.012, 6, 120]} />
+        <meshBasicMaterial color="#ffd98a" transparent opacity={0.55} />
+      </mesh>
+    </>
+  )
+}
+
+/** 2-слайд: мезозойдың «қабатты бағанасы» — триас, юра және бор шөгінділері бірінен соң бірі қаланып, жанады. */
 export default function StrataScene() {
   const column = useRef<THREE.Group>(null)
   const orbit = useRef<THREE.Group>(null)
   const { base, layers, fossils, top } = useMemo(buildColumn, [])
   const ammonite = useMemo(() => ammoniteGeo('#d6b97a', '#8a6a3c'), [])
   const mid = top / 2
+  const age = useAge(10)
 
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
@@ -119,25 +188,17 @@ export default function StrataScene() {
         <mesh geometry={base} castShadow receiveShadow>
           <meshStandardMaterial vertexColors roughness={0.95} />
         </mesh>
-        {layers.map((layer) => (
-          <group key={layer.name}>
-            <mesh geometry={layer.geo} castShadow receiveShadow>
-              <meshStandardMaterial vertexColors roughness={0.92} />
-            </mesh>
-            <Label position={[0, layer.y0 + layer.height / 2, 0]}>{layer.label}</Label>
-          </group>
-        ))}
-        {fossils.map((f, i) => (
-          <mesh key={i} geometry={ammonite} position={f.position} rotation={f.rotation} scale={f.scale} castShadow>
-            <meshStandardMaterial vertexColors roughness={0.55} metalness={0.15} />
-          </mesh>
-        ))}
-        {/* Кезеңдер арасындағы шекараларды белгілейтін алтын сақиналар */}
-        {layers.map((layer) => (
-          <mesh key={layer.name} position={[0, layer.y0 - GAP / 2, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[RADIUS * 1.12, 0.012, 6, 120]} />
-            <meshBasicMaterial color="#e2c07a" transparent opacity={0.55} />
-          </mesh>
+        {layers.map((layer, li) => (
+          <Stratum key={layer.name} layer={layer} index={li} age={age}>
+            {/* Қабаттың бүйіріндегі аммониттер қабатпен бірге шығады */}
+            {fossils
+              .filter((f) => f.layer === li)
+              .map((f, i) => (
+                <mesh key={i} geometry={ammonite} position={f.position} rotation={f.rotation} scale={f.scale} castShadow>
+                  <meshStandardMaterial vertexColors roughness={0.55} metalness={0.15} />
+                </mesh>
+              ))}
+          </Stratum>
         ))}
       </group>
 
@@ -159,7 +220,9 @@ export default function StrataScene() {
         })}
       </group>
 
-      <Particles count={380} box={[14, 9, 14]} position={[0, mid, 0]} color="#e9cf96" size={0.045} wobble={0.25} twinkle={0.8} velocity={[0, 0.06, 0]} seed={5} />
+      <Motes count={380} box={[14, 9, 14]} position={[0, mid, 0]} color="#e9cf96" size={0.045} wobble={0.25} twinkle={0.8} velocity={[0, 0.06, 0]} seed={5} />
+      {/* Лавадан көтерілген ұшқындар */}
+      <Motes kind="spark" count={90} box={[5, 5, 5]} position={[0, 0.6, 0]} color="#ff8a4a" color2="#ffd08a" velocity={[0.05, 0.7, 0]} seed={6} />
     </>
   )
 }

@@ -17,6 +17,11 @@ interface LabelProps {
 /** <Swap> ішіндегі жазулар тек белсенді нысанда көрінуі үшін (drei <Html> ата-топтың visible қасиетін ескермейді). */
 const Shown = createContext(true)
 
+/** Ішіндегі жазуларды (Label) көрсету не жасыру: карусельдегі таңдалмаған нысандардың жазуы көрінбейді. */
+export function Labels({ shown, children }: { shown: boolean; children: ReactNode }) {
+  return <Shown.Provider value={shown}>{children}</Shown.Provider>
+}
+
 export function Label({ position, tone = 'sand', children }: LabelProps) {
   const shown = useContext(Shown)
   if (!shown) return null
